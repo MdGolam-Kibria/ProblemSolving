@@ -1,6 +1,5 @@
 package com.problemSolving.transactionalBehaviour;
 
-import com.problemSolving.entity.Person;
 import com.problemSolving.repository.PersonRepository;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -8,15 +7,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 
 @RestController
-public class IolationTesting extends Helper{
+public class IolationTesting extends Helper {
     private final PersonRepository personRepository;
 
     public IolationTesting(PersonRepository personRepository) {
         this.personRepository = personRepository;
     }
+
     @GetMapping("/updatePersonWithDefaultIsolation")
     @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.DEFAULT)
     public boolean updatePersonWithDefaultIsolation() {
@@ -24,7 +24,6 @@ public class IolationTesting extends Helper{
          * This is the default isolation level used by your database system.
          * It typically corresponds to the default isolation level of your database management system.
          * It's a good choice if you want to rely on the default behavior.
-
          * For Isolation.DEFAULT the Isolation depend on database system as like shared below,
          * For MySql   : the Isolation.DEFAULT = Isolation.REPEATABLE_READ
          * For Oracle  : the Isolation.DEFAULT = Isolation.READ_COMMITTED
@@ -42,7 +41,6 @@ public class IolationTesting extends Helper{
          * This is the default isolation level used by your database system.
          * It typically corresponds to the default isolation level of your database management system.
          * It's a good choice if you want to rely on the default behavior.
-
          * For Isolation.DEFAULT the Isolation depend on database system as like shared below,
          * For MySql   : the Isolation.DEFAULT = Isolation.REPEATABLE_READ
          * For Oracle  : the Isolation.DEFAULT = Isolation.READ_COMMITTED
@@ -51,6 +49,7 @@ public class IolationTesting extends Helper{
         updatePersonWithReadUnCommitted(personRepository);
         return true;
     }
+
     @GetMapping("/updatePersonWithRepeatedRead")
     @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
     public boolean updatePersonWithRepeatableRead() {
@@ -71,25 +70,25 @@ public class IolationTesting extends Helper{
     }
 
     @GetMapping("/updatePersonPersonWithSerializable")
-    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.SERIALIZABLE)
+  //  @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.SERIALIZABLE)
     public boolean updatePersonPersonWithSerializable() {
-        //@TODO not tested till now..need to test by concrete call by jmitter with another service  
-               /*
-       Serializable (Isolation Level 3): This is the highest isolation level. Service B will effectively
-             have to wait until Service A's transaction is complete before it can read or update the row.
-             It guarantees that the data remains consistent but can lead to potential performance issues due to locking.
+        // Create a latch to synchronize the threads
+        CountDownLatch latch = new CountDownLatch(2);
 
-             In your scenario, if you want to avoid Service B reading the uncommitted change made by Service A, you should use
-             at least the "Read Committed" isolation level. Depending on your specific requirements for data consistency
-             and performance, you can choose a higher isolation level like "Repeatable Read" or "Serializable."
+        // Simulate two services concurrently updating the same record
+        Thread thread1 = new Thread(() -> updatePersonWithSerializable("thread1", latch,personRepository,10));
+        Thread thread2 = new Thread(() -> updatePersonWithSerializable("thread2", latch, personRepository,20));
+        thread1.start();
+        thread2.start();
 
-             Keep in mind that higher isolation levels come with increased locking and potential performance implications,
-             so it's essential to choose the appropriate level based on your application's specific needs.
-  */
-        updatePersonPersonWithSerializable(personRepository);
+        try {
+            // Wait for both threads to complete
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         return true;
     }
-
-
 
 }
